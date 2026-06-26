@@ -4,6 +4,8 @@
 
 A premium, interactive 3D WebGL-based weather simulation application depicting the Victoria Harbour skyline in Tsim Sha Tsui, Hong Kong. The application synchronizes with real-time astronomical and weather data from the **Hong Kong Observatory (HKO) Open Data API** to dynamically adjust the environment, including time-of-day lighting, sky conditions, and weather effects.
 
+Live Demo : https://demo.cloudian.hk/3d_weather_simulation/v1.0.0/
+
 ---
 
 ## 🌟 Key Features
