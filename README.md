@@ -158,4 +158,4 @@ Simply host the project folder on a standard **PHP web server** to allow the COR
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE details for more information.
+This project is licensed under the Apache License 2.0 - see the LICENSE details for more information.
