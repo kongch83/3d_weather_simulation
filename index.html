@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title data-i18n="app_title">3D 實時天氣模擬</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <!-- Google Fonts: Inter and Montserrat for modern premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@500;700;800&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for UI icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Microsoft JhengHei', 'sans-serif'],
+                        display: ['Montserrat', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <!-- Three.js and Addons via Import Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body class="overflow-hidden bg-slate-950 text-slate-100 select-none">
+    <!-- 3D WebGL Canvas -->
+    <canvas id="webgl-canvas" class="absolute top-0 left-0 w-full h-full z-0 block"></canvas>
+
+    <!-- Floating UI Music Toggle Button (Always visible) -->
+    <button id="music-toggle-btn"
+        class="fixed bottom-[8rem] right-4 md:bottom-[10rem] md:right-8 z-50 pointer-events-auto glass w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-900/80 shadow-2xl transition-all duration-300 cursor-pointer border border-slate-700/30"
+        style="pointer-events: auto !important; z-index: 99999 !important;" data-i18n-title="music_toggle_title"
+        title="背景音樂開關">
+        <i id="music-icon" class="fa-solid fa-volume-xmark text-base md:text-lg"></i>
+    </button>
+
+    <!-- Floating UI Reset View Button (Always visible) -->
+    <button id="reset-view-btn"
+        class="fixed bottom-18 right-4 md:bottom-[6.5rem] md:right-8 z-50 pointer-events-auto glass w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-900/80 shadow-2xl transition-all duration-300 cursor-pointer border border-slate-700/30"
+        style="pointer-events: auto !important; z-index: 99999 !important;" data-i18n-title="reset_view_title"
+        title="重置視角">
+        <i id="reset-view-icon" class="fa-solid fa-arrow-rotate-left text-base md:text-lg"></i>
+    </button>
+
+    <!-- Floating UI Toggle Button (Always visible) -->
+    <button id="toggle-ui-btn"
+        class="fixed bottom-4 right-4 md:bottom-8 md:right-8 z-50 pointer-events-auto glass w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-900/80 shadow-2xl transition-all duration-300 cursor-pointer border border-slate-700/30"
+        style="pointer-events: auto !important; z-index: 99999 !important;">
+        <i id="toggle-ui-icon" class="fa-solid fa-eye-slash text-base md:text-lg"></i>
+    </button>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-container"
+        class="absolute top-0 left-0 w-full h-full z-10 pointer-events-none flex flex-col justify-between p-2 md:pt-6 md:pb-6 md:pl-4 md:pr-4">
+        <!-- Header / Logo -->
+        <header
+            class="app-header glass relative z-50 pointer-events-auto flex flex-wrap md:flex-nowrap gap-2 md:gap-0 items-center justify-between px-4 py-2.5 md:px-6 md:py-4 rounded-2xl w-[99%] max-w-[99%] mx-auto shadow-2xl transition-all duration-300"
+            style="pointer-events: auto !important;">
+            <div class="logo flex items-center gap-2 md:gap-3">
+                <div
+                    class="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center">
+                    <i class="fa-solid fa-cloud-sun-rain text-sky-400 text-base md:text-xl accent-icon-pulse"></i>
+                </div>
+                <div class="logo-text">
+                    <h1 data-i18n="app_title"
+                        class="font-display font-bold text-sm md:text-xl tracking-wide bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                        3D 實時天氣模擬</h1>
+                    <span data-i18n="sub_title"
+                        class="text-[9px] md:text-xs text-slate-400 tracking-wider block">香港</span>
+                </div>
+            </div>
+            <!-- Center: Camera Coordinates Info -->
+            <div id="camera-coords-info"
+                class="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-slate-900/40 border border-slate-700/30 text-[10px] md:text-xs text-slate-400 font-mono order-3 md:order-none w-full md:w-auto justify-center mt-2 md:mt-0">
+                <span class="flex items-center gap-1.5 text-sky-400">
+                    <i class="fa-solid fa-camera text-[10px] md:text-xs"></i>
+                    CAM: <span id="cam-pos-val" class="text-slate-300">X: -4.2 Y: 59.0 Z: 96.5</span>
+                </span>
+                <div class="w-px h-3 bg-slate-700/50"></div>
+                <span class="flex items-center gap-1.5 text-indigo-400">
+                    <i class="fa-solid fa-crosshairs text-[10px] md:text-xs"></i>
+                    TAR: <span id="cam-tar-val" class="text-slate-300">X: -3.5 Y: 25.2 Z: -28.6</span>
+                </span>
+            </div>
+            <!-- Right: Location & Time & Language -->
+            <div class="flex items-center gap-2 md:gap-3">
+                <!-- Date Indicator -->
+                <div id="date-display"
+                    class="system-date font-mono font-medium text-xs md:text-sm text-slate-200 tracking-wider bg-slate-900/60 border border-slate-800 px-3 py-1 md:px-4 md:py-1.5 rounded-xl shadow-inner flex items-center">
+                    ----- --- --
+                </div>
+                <div class="system-time font-mono font-medium text-xs md:text-sm text-slate-200 tracking-wider bg-slate-900/60 border border-slate-800 px-3 py-1 md:px-4 md:py-1.5 rounded-xl shadow-inner"
+                    id="clock">--:--:--</div>
+
+                <!-- Language Selector Dropdown -->
+                <div class="relative inline-block text-left z-50 pointer-events-auto" id="lang-selector-container">
+                    <button type="button" id="lang-btn"
+                        class="flex items-center gap-1 font-sans font-medium text-xs md:text-sm text-slate-200 bg-slate-900/60 border border-slate-800 px-3 py-1 md:px-4 md:py-1.5 rounded-xl shadow-inner hover:bg-slate-900/80 hover:border-slate-700/60 focus:outline-none transition-all duration-300 cursor-pointer">
+                        <span id="current-lang-text">繁體</span>
+                        <span class="text-[10px] md:text-xs text-slate-400 ml-0.5">▼</span>
+                    </button>
+                    <!-- Dropdown menu -->
+                    <div id="lang-dropdown-menu"
+                        class="hidden absolute right-0 mt-2 w-32 md:w-36 rounded-xl glass border border-slate-700/20 shadow-2xl origin-top-right focus:outline-none z-50">
+                        <div class="py-1" role="none">
+                            <button
+                                class="lang-option w-full text-left px-4 py-2 text-xs md:text-sm text-sky-400 font-semibold hover:bg-slate-900/60 transition-colors duration-150"
+                                data-lang="zh-Hant" role="menuitem">
+                                <span>繁體</span>
+                            </button>
+                            <button
+                                class="lang-option w-full text-left px-4 py-2 text-xs md:text-sm text-slate-300 hover:text-white hover:bg-slate-900/60 transition-colors duration-150"
+                                data-lang="zh-Hans" role="menuitem">
+                                <span>簡体</span>
+                            </button>
+                            <button
+                                class="lang-option w-full text-left px-4 py-2 text-xs md:text-sm text-slate-300 hover:text-white hover:bg-slate-900/60 transition-colors duration-150"
+                                data-lang="en" role="menuitem">
+                                <span>English</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area: Floating Panels -->
+        <div class="flex-grow w-[99%] max-w-[99%] mx-auto flex flex-col md:flex-row justify-between items-start gap-4 md:gap-6 my-2 md:my-6 overflow-hidden pointer-events-none"
+            style="pointer-events: none !important;">
+            <!-- Left Side: Weather Status Panels -->
+            <div id="left-panels-container" class="w-full md:w-96 flex flex-col gap-3 md:gap-6 pointer-events-auto"
+                style="pointer-events: auto !important;">
+                <!-- Mobile Tab Switcher (Visible only on mobile) -->
+                <div
+                    class="flex md:hidden bg-slate-900/60 p-1 rounded-xl border border-slate-800/80 gap-1 w-full pointer-events-auto">
+                    <button id="tab-weather-btn"
+                        class="mobile-tab-btn active flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold text-center border border-transparent transition-all duration-300 cursor-pointer">
+                        <i class="fa-solid fa-cloud-sun-rain mr-1"></i><span data-i18n="tab_weather">天氣數據</span>
+                    </button>
+                    <button id="tab-status-btn"
+                        class="mobile-tab-btn flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold text-center border border-transparent transition-all duration-300 text-slate-400 hover:text-slate-200 cursor-pointer">
+                        <i class="fa-solid fa-chart-simple mr-1"></i><span data-i18n="tab_status">模擬場境</span>
+                    </button>
+                </div>
+
+                <!-- Weather Details Card -->
+                <main id="hud-weather-card"
+                    class="hud-panel glass rounded-2xl p-4 md:p-6 shadow-2xl border border-slate-700/20 backdrop-blur-md flex md:flex flex-col gap-4 md:gap-5 animate-fade-in-up">
+                    <!-- Section Header (Desktop only) -->
+                    <div class="hidden md:flex items-center justify-between border-b border-slate-800/60 pb-3">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-cloud-sun-rain text-sky-400 text-sm"></i>
+                            <span data-i18n="tab_weather"
+                                class="text-xs font-bold tracking-wider text-slate-300 uppercase">天氣數據</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 font-mono tracking-widest"> </span>
+                    </div>
+                    <!-- Weather Condition Summary -->
+                    <div class="weather-summary flex items-center justify-between border-b border-slate-800/60 pb-5">
+                        <div class="flex items-center gap-3.5 md:gap-5">
+                            <div class="temp-container flex items-baseline">
+                                <span id="temp-val"
+                                    class="font-display font-extrabold text-5xl md:text-6xl tracking-tighter text-slate-50">--</span>
+                                <span class="unit font-display font-semibold text-2xl text-slate-400 ml-1">°C</span>
+                            </div>
+                            <div class="w-px h-8 bg-slate-800/60"></div>
+                            <div class="flex flex-col">
+                                <span data-i18n="rain_chance_label" class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">下雨機會</span>
+                                <span id="rainy-psr" class="text-sm font-bold text-sky-400 font-sans mt-0.5">--</span>
+                            </div>
+                        </div>
+                        <div class="weather-icon-desc flex flex-col items-end">
+                            <div id="weather-icon-container"
+                                class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 bg-slate-900/60 border border-slate-800 overflow-hidden p-1.5">
+                                <img id="weather-icon" class="w-full h-full object-contain weather-icon-pulse"
+                                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                    alt="天氣圖示" />
+                            </div>
+                            <div id="weather-desc" data-i18n="weather_getting_data"
+                                class="text-sm font-medium text-slate-300 mt-2 font-display">
+                                正在獲取數據...</div>
+                        </div>
+                    </div>
+
+                    <!-- Details Grid -->
+                    <div class="weather-details grid grid-cols-2 gap-4">
+                        <div
+                            class="detail-item bg-slate-900/35 border border-slate-800/40 rounded-xl p-3 flex flex-col gap-1 shadow-inner">
+                            <span class="label text-[11px] text-slate-400 font-medium flex items-center gap-1.5"><i
+                                    class="fa-solid fa-droplet text-cyan-400"></i> <span
+                                    data-i18n="humidity_label">相對濕度</span></span>
+                            <span class="value font-display font-semibold text-lg text-slate-200"
+                                id="humidity-val">--%</span>
+                        </div>
+                        <div
+                            class="detail-item bg-slate-900/35 border border-slate-800/40 rounded-xl p-3 flex flex-col gap-1 shadow-inner">
+                            <span class="label text-[11px] text-slate-400 font-medium flex items-center gap-1.5"><i
+                                    class="fa-solid fa-sun text-amber-400"></i> <span
+                                    data-i18n="uv_label">紫外線指數</span></span>
+                            <span class="value font-display font-semibold text-lg text-slate-200" id="uv-val">--</span>
+                        </div>
+                        <div
+                            class="detail-item bg-slate-900/35 border border-slate-800/40 rounded-xl p-3 flex flex-col gap-1 shadow-inner">
+                            <span class="label text-[11px] text-slate-400 font-medium flex items-center gap-1.5"><i
+                                    class="fa-solid fa-wind text-teal-300"></i> <span
+                                    data-i18n="wind_label">風速及風向</span></span>
+                            <span class="value font-display font-semibold text-[13px] md:text-sm text-slate-200 truncate mt-0.5" id="wind-val">--</span>
+                        </div>
+                        <div
+                            class="detail-item bg-slate-900/35 border border-slate-800/40 rounded-xl p-3 flex flex-col gap-1 shadow-inner">
+                            <span class="label text-[11px] text-slate-400 font-medium flex items-center gap-1.5"><i
+                                    class="fa-solid fa-triangle-exclamation text-amber-400"></i> <span
+                                    data-i18n="warning_label">特別警號</span></span>
+                            <span class="value text-xs md:text-sm font-semibold text-slate-200 mt-1" id="warning-val"
+                                data-i18n="no_warning">無特別警告</span>
+                        </div>
+                        <div
+                            class="detail-item bg-slate-900/35 border border-slate-800/40 rounded-xl p-3 flex flex-col gap-1 shadow-inner">
+                            <span class="label text-[11px] text-slate-400 font-medium flex items-center gap-1.5"><i
+                                    class="fa-solid fa-sun text-amber-500"></i> <span
+                                    data-i18n="sunrise_label">日出時間</span></span>
+                            <span class="value font-display font-semibold text-lg text-slate-200"
+                                id="sunrise-val">--:--</span>
+                        </div>
+                        <div
+                            class="detail-item bg-slate-900/35 border border-slate-800/40 rounded-xl p-3 flex flex-col gap-1 shadow-inner">
+                            <span class="label text-[11px] text-slate-400 font-medium flex items-center gap-1.5"><i
+                                    class="fa-solid fa-moon text-indigo-400"></i> <span
+                                    data-i18n="sunset_label">日落時間</span></span>
+                            <span class="value font-display font-semibold text-lg text-slate-200"
+                                id="sunset-val">--:--</span>
+                        </div>
+                        <!--
+                        <div
+                            class="detail-item bg-slate-900/35 border border-slate-800/40 rounded-xl p-3 flex flex-col gap-1 shadow-inner col-span-2">
+                            <span class="label text-[11px] text-slate-400 font-medium flex items-center gap-1.5"><i
+                                    class="fa-solid fa-tower-broadcast text-emerald-400"></i> 監測站</span>
+                            <span class="value text-xs font-semibold text-slate-200 truncate mt-1"
+                                id="station-val">香港天文台</span>
+                        </div>
+                        -->
+                    </div>
+
+                    <!-- Sync Status Info -->
+                    <div class="hud-footer flex flex-col gap-3 pt-2 border-t border-slate-800/60">
+                        <div class="api-status flex items-center gap-2 text-xs">
+                            <span class="status-dot w-2 h-2 rounded-full inline-block online"
+                                id="status-indicator"></span>
+                            <span id="status-text" data-i18n="status_connected"
+                                class="text-slate-400 font-medium">連線正常</span>
+                        </div>
+                        <div class="refresh-countdown flex flex-col gap-1 text-[11px]">
+                            <div class="flex justify-between items-center text-slate-400">
+                                <span data-i18n="next_sync">下一次同步更新：</span>
+                                <span><strong id="timer-val" class="font-mono text-slate-200">60</strong> <span
+                                        data-i18n="seconds">秒</span></span>
+                            </div>
+                            <div class="progress-bar w-full h-1 bg-slate-800/80 rounded-full overflow-hidden">
+                                <div class="progress-fill h-full bg-gradient-to-r from-sky-500 to-indigo-500 origin-left"
+                                    id="progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Right Side: Read-only visual mode indicator (Locked in Auto Sync) -->
+                <div id="hud-status-card"
+                    class="w-full md:w-80 md:absolute md:top-[6.8rem] md:right-8 flex flex-col gap-4 pointer-events-auto hidden md:flex animate-fade-in-up"
+                    style="pointer-events: auto !important;">
+                    <div class="status-panel glass rounded-2xl p-4 md:p-5 shadow-2xl border border-slate-700/20 backdrop-blur-md flex flex-col gap-3 md:gap-4"
+                        id="status-panel">
+                        <!-- Section Header (Desktop only) -->
+                        <div class="hidden md:flex items-center justify-between border-b border-slate-800/60 pb-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-globe text-sky-400 text-sm"></i>
+                                <span data-i18n="tab_status"
+                                    class="text-xs font-bold tracking-wider text-slate-300 uppercase">模擬場境</span>
+                            </div>
+                            <span class="text-[10px] text-slate-500 font-mono tracking-widest"> </span>
+                        </div>
+                        <div
+                            class="status-header flex items-center justify-between text-xs font-semibold tracking-wider text-sky-400 uppercase">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-sliders pulse-icon text-sm"></i> <span data-i18n="control">控制</span>
+                            </div>
+                            <div class="flex items-center bg-slate-950/80 p-0.5 rounded-lg border border-slate-800/60 select-none">
+                                <button id="mode-auto-btn" class="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider transition-all duration-300 bg-sky-500/20 text-sky-400 border border-sky-500/30" data-i18n="mode_auto">自動</button>
+                                <button id="mode-manual-btn" class="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider transition-all duration-300 text-slate-400 hover:text-slate-200" data-i18n="mode_manual">手動</button>
+                            </div>
+                        </div>
+
+                        <div class="status-content flex flex-col gap-3.5">
+                            <div class="status-section flex flex-col gap-2">
+                                <span data-i18n="weather_condition_title"
+                                    class="sec-title text-[10px] text-slate-400 font-bold uppercase tracking-wider">當下天氣狀態</span>
+                                <div class="indicator-group grid grid-cols-2 gap-2 text-xs" id="weather-indicators">
+                                    <div class="indicator pointer-events-none flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-weather="clear">
+                                        <i class="fa-solid fa-sun text-amber-500"></i> <span
+                                            data-i18n="weather_clear">晴朗</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-weather="cloudy">
+                                        <i class="fa-solid fa-cloud text-slate-400"></i> <span
+                                            data-i18n="weather_cloudy">多雲</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-weather="rainy">
+                                        <i class="fa-solid fa-cloud-showers-heavy text-blue-400"></i> <span
+                                            data-i18n="weather_rainy">下雨</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-weather="thunderstorm">
+                                        <i class="fa-solid fa-cloud-bolt text-purple-400"></i> <span
+                                            data-i18n="weather_thunderstorm">雷暴</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-weather="foggy">
+                                        <i class="fa-solid fa-smog text-teal-400"></i> <span
+                                            data-i18n="weather_foggy">大霧 / 低能見度</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-weather="windy">
+                                        <i class="fa-solid fa-wind text-teal-300"></i> <span
+                                            data-i18n="weather_windy">強風 / 大風</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="status-divider h-px bg-slate-800/60"></div>
+
+                            <div class="status-section flex flex-col gap-2">
+                                <span data-i18n="sunlight_period_title"
+                                    class="sec-title text-[10px] text-slate-400 font-bold uppercase tracking-wider">實時日光時段</span>
+                                <div class="indicator-group grid grid-cols-4 gap-1 text-[10px] md:text-[11px]"
+                                    id="time-indicators">
+                                    <div class="indicator pointer-events-none flex flex-col items-center justify-center py-2 px-0.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-time="morning">
+                                        <i class="fa-solid fa-cloud-sun text-cyan-300 mb-1 text-sm"></i> <span
+                                            data-i18n="time_morning">清晨</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex flex-col items-center justify-center py-2 px-0.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-time="day">
+                                        <i class="fa-solid fa-sun text-amber-500 mb-1 text-sm"></i> <span
+                                            data-i18n="time_day">白天</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex flex-col items-center justify-center py-2 px-0.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-time="sunset">
+                                        <i class="fa-solid fa-mountain-sun text-orange-400 mb-1 text-sm"></i> <span
+                                            data-i18n="time_sunset">黃昏</span>
+                                    </div>
+                                    <div class="indicator pointer-events-none flex flex-col items-center justify-center py-2 px-0.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 select-none shadow-sm transition-all duration-300"
+                                        data-time="night">
+                                        <i class="fa-solid fa-moon text-indigo-400 mb-1 text-sm"></i> <span
+                                            data-i18n="time_night">晚上</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Main JavaScript App Entry -->
+    <script type="module" src="js/app.js?v=1.0.0"></script>
+</body>
+
+</html>
